@@ -338,6 +338,11 @@ func (s *session) prepMessageForSend(msg *Message, inReplyTo *Message) (msgBytes
 	return
 }
 
+// forceNextSenderMsgSeqNum
+func (s *session) forceNextSenderMsgSeqNum(seqNum int) error {
+	return s.store.SetNextSenderMsgSeqNum(seqNum)
+}
+
 func (s *session) persist(seqNum int, msgBytes []byte) error {
 	if !s.DisableMessagePersist {
 		return s.store.SaveMessageAndIncrNextSenderMsgSeqNum(seqNum, msgBytes)

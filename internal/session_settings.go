@@ -22,8 +22,9 @@ type SessionSettings struct {
 	DefaultApplVerID string
 
 	// Specific to initiators.
-	ReconnectInterval    time.Duration
-	LogoutTimeout        time.Duration
-	LogonTimeout         time.Duration
-	SocketConnectAddress []string
+	ReconnectInterval         time.Duration
+	LogoutTimeout             time.Duration
+	LogonTimeout              time.Duration
+	LogonForceSenderMsgSeqNum bool
+	SocketConnectAddress      []string
 }

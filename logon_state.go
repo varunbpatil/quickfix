@@ -17,9 +17,13 @@ package quickfix
 
 import (
 	"bytes"
+	"regexp"
+	"strconv"
 
 	"github.com/quickfixgo/quickfix/internal"
 )
+
+var msgSeqNumTooLowRegex = regexp.MustCompile(`MsgSeqNum too low, expecting (\d+) but received \d+`)
 
 type logonState struct{ connectedNotLoggedOn }
 
@@ -29,6 +33,49 @@ func (s logonState) FixMsgIn(session *session, msg *Message) (nextState sessionS
 	msgType, err := msg.Header.GetBytes(tagMsgType)
 	if err != nil {
 		return handleStateError(session, err)
+	}
+
+	// If we receive a logout while in the logon state and the reason for logout is the message
+	// sequence number being too low, it means the sender has lost session state (testing?). There
+	// is no recovering from lost data, so, if the application wants to, we can force the next
+	// sender message sequence number to be equal to whatever the target expects it to be. Without
+	// this, the application will have to wait until the sender message sequence number naturally
+	// matches what the target is expecting (as a result of retrying logon multiple times) and then
+	// the logon will succeed, but this could take several hours depending on the sequence num gap.
+	// This is almost certainly required in testing where the sender session state is discarded
+	// after testing (assuming the target doesn't support ResetSeqNumFlag 141=Y).
+	if bytes.Equal(msgType, msgTypeLogout) {
+		session.log.OnEventf("Invalid Session State: Received Logout %s while waiting for Logon", msg)
+
+		// Get the reason for logout.
+		reason, err := msg.Body.GetString(tagText)
+		if err != nil {
+			return handleStateError(session, err)
+		}
+
+		// Check if the reason is message sequence number being too low.
+		res := msgSeqNumTooLowRegex.FindStringSubmatch(reason)
+		if res == nil {
+			return latentState{}
+		}
+
+		// Message sequence number is too low.
+		if session.LogonForceSenderMsgSeqNum {
+			// Get the value expected by the target.
+			expectedMsgSeqNum, err := strconv.Atoi(res[1])
+			if err != nil {
+				return handleStateError(session, err)
+			}
+
+			session.log.OnEventf("Forcing next sender message sequence number to %d", expectedMsgSeqNum)
+
+			// Force the next sender message sequence number to be equal to the expected value.
+			if err := session.forceNextSenderMsgSeqNum(expectedMsgSeqNum); err != nil {
+				return handleStateError(session, err)
+			}
+		}
+
+		return latentState{}
 	}
 
 	if !bytes.Equal(msgType, msgTypeLogon) {

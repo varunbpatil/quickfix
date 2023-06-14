@@ -46,6 +46,7 @@ const (
 	ReconnectInterval            string = "ReconnectInterval"
 	LogoutTimeout                string = "LogoutTimeout"
 	LogonTimeout                 string = "LogonTimeout"
+	LogonForceSenderMsgSeqNum    string = "LogonForceSenderMsgSeqNum"
 	HeartBtInt                   string = "HeartBtInt"
 	HeartBtIntOverride           string = "HeartBtIntOverride"
 	FileLogPath                  string = "FileLogPath"

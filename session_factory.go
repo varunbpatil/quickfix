@@ -404,6 +404,16 @@ func (f sessionFactory) buildInitiatorSettings(session *session, settings *Sessi
 		session.LogonTimeout = time.Duration(timeout) * time.Second
 	}
 
+	if settings.HasSetting(config.LogonForceSenderMsgSeqNum) {
+
+		forceSenderMsgSeqNum, err := settings.BoolSetting(config.LogonForceSenderMsgSeqNum)
+		if err != nil {
+			return err
+		}
+
+		session.LogonForceSenderMsgSeqNum = forceSenderMsgSeqNum
+	}
+
 	return f.configureSocketConnectAddress(session, settings)
 }
 
