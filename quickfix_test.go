@@ -127,6 +127,8 @@ func (e *MockApp) FromApp(msg *Message, sessionID SessionID) (reject MessageReje
 	return nil
 }
 
+func (e *MockApp) InSession(sessionID SessionID) {}
+
 type MessageFactory struct {
 	seqNum int
 }

@@ -103,6 +103,10 @@ func (s logonState) FixMsgIn(session *session, msg *Message) (nextState sessionS
 			return handleStateError(session, err)
 		}
 	}
+
+	// Notify the app that the session is ready.
+	session.application.InSession(session.sessionID)
+
 	return inSession{}
 }
 

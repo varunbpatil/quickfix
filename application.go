@@ -38,4 +38,7 @@ type Application interface {
 
 	// FromApp notification of app message being received from target.
 	FromApp(message *Message, sessionID SessionID) MessageRejectError
+
+	// InSession notifies the app when the session is ready.
+	InSession(sessionID SessionID)
 }
