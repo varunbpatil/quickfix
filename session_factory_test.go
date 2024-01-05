@@ -191,7 +191,9 @@ func (s *SessionFactorySuite) TestStartAndEndTime() {
 	s.Nil(err)
 	s.NotNil(session.SessionTime)
 
-	expectedRange, _ := internal.NewUTCTimeRange(internal.NewTimeOfDay(12, 0, 0), internal.NewTimeOfDay(14, 0, 0), []time.Weekday{})
+	var weekday []time.Weekday
+	expectedRange, err := internal.NewUTCTimeRange(internal.NewTimeOfDay(12, 0, 0), internal.NewTimeOfDay(14, 0, 0), weekday)
+	s.Nil(err)
 	s.Equal(
 		*expectedRange,
 		*session.SessionTime,
@@ -207,7 +209,9 @@ func (s *SessionFactorySuite) TestStartAndEndTimeAndTimeZone() {
 	s.Nil(err)
 	s.NotNil(session.SessionTime)
 
-	expectedRange, _ := internal.NewTimeRangeInLocation(internal.NewTimeOfDay(12, 0, 0), internal.NewTimeOfDay(14, 0, 0), []time.Weekday{}, time.Local)
+	var weekday []time.Weekday
+	expectedRange, err := internal.NewTimeRangeInLocation(internal.NewTimeOfDay(12, 0, 0), internal.NewTimeOfDay(14, 0, 0), weekday, time.Local)
+	s.Nil(err)
 	s.Equal(
 		*expectedRange,
 		*session.SessionTime,
@@ -222,7 +226,8 @@ func (s *SessionFactorySuite) TestStartAndEndTimeAndWeekdays() {
 	s.Nil(err)
 	s.NotNil(session.SessionTime)
 
-	expectedRange, _ := internal.NewUTCTimeRange(internal.NewTimeOfDay(12, 0, 0), internal.NewTimeOfDay(14, 0, 0), []time.Weekday{time.Monday, time.Tuesday, time.Wednesday})
+	expectedRange, err := internal.NewUTCTimeRange(internal.NewTimeOfDay(12, 0, 0), internal.NewTimeOfDay(14, 0, 0), []time.Weekday{time.Monday, time.Tuesday, time.Wednesday})
+	s.Nil(err)
 	s.Equal(
 		*expectedRange,
 		*session.SessionTime,
@@ -239,7 +244,8 @@ func (s *SessionFactorySuite) TestStartAndEndTimeAndTimeZoneAndWeekdays() {
 	s.Nil(err)
 	s.NotNil(session.SessionTime)
 
-	expectedRange, _ := internal.NewTimeRangeInLocation(internal.NewTimeOfDay(12, 0, 0), internal.NewTimeOfDay(14, 0, 0), []time.Weekday{time.Monday, time.Tuesday}, time.Local)
+	expectedRange, err := internal.NewTimeRangeInLocation(internal.NewTimeOfDay(12, 0, 0), internal.NewTimeOfDay(14, 0, 0), []time.Weekday{time.Monday, time.Tuesday}, time.Local)
+	s.Nil(err)
 	s.Equal(
 		*expectedRange,
 		*session.SessionTime,
@@ -266,11 +272,12 @@ func (s *SessionFactorySuite) TestStartAndEndTimeAndStartAndEndDay() {
 		s.Nil(err)
 		s.NotNil(session.SessionTime)
 
-		expectedRange, _ := internal.NewUTCWeekRange(
+		expectedRange, err := internal.NewUTCWeekRange(
 			internal.NewTimeOfDay(12, 0, 0), internal.NewTimeOfDay(14, 0, 0),
 			time.Sunday, time.Thursday,
 		)
 
+		s.Nil(err)
 		s.Equal(
 			*expectedRange,
 			*session.SessionTime,
@@ -289,11 +296,12 @@ func (s *SessionFactorySuite) TestStartAndEndTimeAndStartAndEndDayAndTimeZone() 
 	s.Nil(err)
 	s.NotNil(session.SessionTime)
 
-	expectedRange, _ := internal.NewWeekRangeInLocation(
+	expectedRange, err := internal.NewWeekRangeInLocation(
 		internal.NewTimeOfDay(12, 0, 0), internal.NewTimeOfDay(14, 0, 0),
 		time.Sunday, time.Thursday, time.Local,
 	)
 
+	s.Nil(err)
 	s.Equal(
 		*expectedRange,
 		*session.SessionTime,

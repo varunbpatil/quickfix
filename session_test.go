@@ -20,10 +20,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/quickfixgo/quickfix/internal"
-
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/quickfixgo/quickfix/internal"
 )
 
 func newFIXString(val string) *FIXString {
@@ -346,13 +346,15 @@ func (s *SessionSuite) TestCheckSessionTimeInRange() {
 		s.session.State = test.before
 
 		now := time.Now().UTC()
-		store := new(memoryStore)
+		memStore, memErr := NewMemoryStoreFactory().Create(s.sessionID)
+		s.Require().Nil(memErr)
+
 		if test.before.IsSessionTime() {
-			s.Require().Nil(store.Reset())
+			s.Require().Nil(memStore.Reset())
 		} else {
-			store.creationTime = now.Add(time.Duration(-1) * time.Minute)
+			memStore.SetCreationTime(now.Add(time.Duration(-1) * time.Minute))
 		}
-		s.session.store = store
+		s.session.store = memStore
 		s.IncrNextSenderMsgSeqNum()
 		s.IncrNextTargetMsgSeqNum()
 
@@ -361,7 +363,7 @@ func (s *SessionSuite) TestCheckSessionTimeInRange() {
 			internal.NewTimeOfDay(now.Add(time.Hour).Clock()),
 			[]time.Weekday{},
 		)
-		s.Assert().Nil(err)
+		s.Nil(err)
 
 		s.session.SessionTime = sessionTime
 
@@ -412,7 +414,7 @@ func (s *SessionSuite) TestCheckSessionTimeNotInRange() {
 			internal.NewTimeOfDay(now.Add(time.Duration(2)*time.Hour).Clock()),
 			[]time.Weekday{},
 		)
-		s.Assert().Nil(err)
+		s.Nil(err)
 
 		s.session.SessionTime = sessionTime
 
@@ -470,7 +472,7 @@ func (s *SessionSuite) TestCheckSessionTimeInRangeButNotSameRangeAsStore() {
 			internal.NewTimeOfDay(now.Add(time.Hour).Clock()),
 			[]time.Weekday{},
 		)
-		s.Assert().Nil(err)
+		s.Nil(err)
 
 		s.session.SessionTime = sessionTime
 
@@ -523,7 +525,7 @@ func (s *SessionSuite) TestIncomingNotInSessionTime() {
 			internal.NewTimeOfDay(now.Add(time.Duration(2)*time.Hour).Clock()),
 			[]time.Weekday{},
 		)
-		s.Assert().Nil(err)
+		s.Nil(err)
 
 		s.session.SessionTime = sessionTime
 		if test.expectOnLogout {
@@ -576,7 +578,7 @@ func (s *SessionSuite) TestSendAppMessagesNotInSessionTime() {
 			internal.NewTimeOfDay(now.Add(time.Duration(2)*time.Hour).Clock()),
 			[]time.Weekday{},
 		)
-		s.Assert().Nil(err)
+		s.Nil(err)
 
 		s.session.SessionTime = sessionTime
 		if test.expectOnLogout {
@@ -625,7 +627,7 @@ func (s *SessionSuite) TestTimeoutNotInSessionTime() {
 				internal.NewTimeOfDay(now.Add(time.Duration(2)*time.Hour).Clock()),
 				[]time.Weekday{},
 			)
-			s.Assert().Nil(err)
+			s.Nil(err)
 
 			s.session.SessionTime = sessionTime
 			if test.expectOnLogout {

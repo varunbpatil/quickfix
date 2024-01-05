@@ -81,9 +81,9 @@ func (r *TimeRange) isInTimeRange(t time.Time) bool {
 	t = t.In(r.loc)
 	ts := NewTimeOfDay(t.Clock()).d
 
-	// Check whether the given time falls on one of the weekdays (if specified).
 	if len(r.weekdays) > 0 {
 		found := false
+
 		for _, weekday := range r.weekdays {
 			if t.Weekday() == weekday {
 				found = true

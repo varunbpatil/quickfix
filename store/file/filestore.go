@@ -13,19 +13,20 @@
 // Contact ask@quickfixengine.org if any conditions of this licensing
 // are not clear to you.
 
-package quickfix
+package file
 
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 
+	"github.com/quickfixgo/quickfix"
 	"github.com/quickfixgo/quickfix/config"
 )
 
@@ -35,12 +36,12 @@ type msgDef struct {
 }
 
 type fileStoreFactory struct {
-	settings *Settings
+	settings *quickfix.Settings
 }
 
 type fileStore struct {
-	sessionID          SessionID
-	cache              *memoryStore
+	sessionID          quickfix.SessionID
+	cache              quickfix.MessageStore
 	offsets            map[int]msgDef
 	bodyFname          string
 	headerFname        string
@@ -55,13 +56,13 @@ type fileStore struct {
 	fileSync           bool
 }
 
-// NewFileStoreFactory returns a file-based implementation of MessageStoreFactory.
-func NewFileStoreFactory(settings *Settings) MessageStoreFactory {
+// NewStoreFactory returns a file-based implementation of MessageStoreFactory.
+func NewStoreFactory(settings *quickfix.Settings) quickfix.MessageStoreFactory {
 	return fileStoreFactory{settings: settings}
 }
 
 // Create creates a new FileStore implementation of the MessageStore interface.
-func (f fileStoreFactory) Create(sessionID SessionID) (msgStore MessageStore, err error) {
+func (f fileStoreFactory) Create(sessionID quickfix.SessionID) (msgStore quickfix.MessageStore, err error) {
 	globalSettings := f.settings.GlobalSettings()
 	dynamicSessions, _ := globalSettings.BoolSetting(config.DynamicSessions)
 
@@ -90,16 +91,21 @@ func (f fileStoreFactory) Create(sessionID SessionID) (msgStore MessageStore, er
 	return newFileStore(sessionID, dirname, fsync)
 }
 
-func newFileStore(sessionID SessionID, dirname string, fileSync bool) (*fileStore, error) {
+func newFileStore(sessionID quickfix.SessionID, dirname string, fileSync bool) (*fileStore, error) {
 	if err := os.MkdirAll(dirname, os.ModePerm); err != nil {
 		return nil, err
 	}
 
-	sessionPrefix := sessionIDFilenamePrefix(sessionID)
+	sessionPrefix := createFilenamePrefix(sessionID)
+
+	memStore, memErr := quickfix.NewMemoryStoreFactory().Create(sessionID)
+	if memErr != nil {
+		return nil, errors.Wrap(memErr, "cache creation")
+	}
 
 	store := &fileStore{
 		sessionID:          sessionID,
-		cache:              &memoryStore{},
+		cache:              memStore,
 		offsets:            make(map[int]msgDef),
 		bodyFname:          path.Join(dirname, fmt.Sprintf("%s.%s", sessionPrefix, "body")),
 		headerFname:        path.Join(dirname, fmt.Sprintf("%s.%s", sessionPrefix, "header")),
@@ -204,24 +210,24 @@ func (store *fileStore) populateCache() (creationTimePopulated bool, err error) 
 		}
 	}
 
-	if timeBytes, err := ioutil.ReadFile(store.sessionFname); err == nil {
+	if timeBytes, err := os.ReadFile(store.sessionFname); err == nil {
 		var ctime time.Time
 		if err := ctime.UnmarshalText(timeBytes); err == nil {
-			store.cache.creationTime = ctime
+			store.cache.SetCreationTime(ctime)
 			creationTimePopulated = true
 		}
 	}
 
-	if senderSeqNumBytes, err := ioutil.ReadFile(store.senderSeqNumsFname); err == nil {
-		if senderSeqNum, err := strconv.Atoi(string(senderSeqNumBytes)); err == nil {
+	if senderSeqNumBytes, err := os.ReadFile(store.senderSeqNumsFname); err == nil {
+		if senderSeqNum, err := strconv.Atoi(strings.Trim(string(senderSeqNumBytes), "\r\n")); err == nil {
 			if err = store.cache.SetNextSenderMsgSeqNum(senderSeqNum); err != nil {
 				return creationTimePopulated, errors.Wrap(err, "cache set next sender")
 			}
 		}
 	}
 
-	if targetSeqNumBytes, err := ioutil.ReadFile(store.targetSeqNumsFname); err == nil {
-		if targetSeqNum, err := strconv.Atoi(string(targetSeqNumBytes)); err == nil {
+	if targetSeqNumBytes, err := os.ReadFile(store.targetSeqNumsFname); err == nil {
+		if targetSeqNum, err := strconv.Atoi(strings.Trim(string(targetSeqNumBytes), "\r\n")); err == nil {
 			if err = store.cache.SetNextTargetMsgSeqNum(targetSeqNum); err != nil {
 				return creationTimePopulated, errors.Wrap(err, "cache set next target")
 			}
@@ -278,39 +284,43 @@ func (store *fileStore) NextTargetMsgSeqNum() int {
 
 // SetNextSenderMsgSeqNum sets the next MsgSeqNum that will be sent.
 func (store *fileStore) SetNextSenderMsgSeqNum(next int) error {
-	if err := store.cache.SetNextSenderMsgSeqNum(next); err != nil {
-		return errors.Wrap(err, "cache")
+	if err := store.setSeqNum(store.senderSeqNumsFile, next); err != nil {
+		return errors.Wrap(err, "file")
 	}
-	return store.setSeqNum(store.senderSeqNumsFile, next)
+	return store.cache.SetNextSenderMsgSeqNum(next)
 }
 
 // SetNextTargetMsgSeqNum sets the next MsgSeqNum that should be received.
 func (store *fileStore) SetNextTargetMsgSeqNum(next int) error {
-	if err := store.cache.SetNextTargetMsgSeqNum(next); err != nil {
-		return errors.Wrap(err, "cache")
+	if err := store.setSeqNum(store.targetSeqNumsFile, next); err != nil {
+		return errors.Wrap(err, "file")
 	}
-	return store.setSeqNum(store.targetSeqNumsFile, next)
+	return store.cache.SetNextTargetMsgSeqNum(next)
 }
 
 // IncrNextSenderMsgSeqNum increments the next MsgSeqNum that will be sent.
 func (store *fileStore) IncrNextSenderMsgSeqNum() error {
-	if err := store.cache.IncrNextSenderMsgSeqNum(); err != nil {
-		return errors.Wrap(err, "cache")
+	if err := store.SetNextSenderMsgSeqNum(store.cache.NextSenderMsgSeqNum() + 1); err != nil {
+		return errors.Wrap(err, "file")
 	}
-	return store.setSeqNum(store.senderSeqNumsFile, store.cache.NextSenderMsgSeqNum())
+	return nil
 }
 
 // IncrNextTargetMsgSeqNum increments the next MsgSeqNum that should be received.
 func (store *fileStore) IncrNextTargetMsgSeqNum() error {
-	if err := store.cache.IncrNextTargetMsgSeqNum(); err != nil {
-		return errors.Wrap(err, "cache")
+	if err := store.SetNextTargetMsgSeqNum(store.cache.NextTargetMsgSeqNum() + 1); err != nil {
+		return errors.Wrap(err, "file")
 	}
-	return store.setSeqNum(store.targetSeqNumsFile, store.cache.NextTargetMsgSeqNum())
+	return nil
 }
 
 // CreationTime returns the creation time of the store.
 func (store *fileStore) CreationTime() time.Time {
 	return store.cache.CreationTime()
+}
+
+// SetCreationTime is a no-op for FileStore.
+func (store *fileStore) SetCreationTime(_ time.Time) {
 }
 
 func (store *fileStore) SaveMessage(seqNum int, msg []byte) error {

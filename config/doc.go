@@ -98,7 +98,7 @@ For week long sessions, the ending day of week for the session. Use in combinati
 
 For daily sessions that are only active on specific days of the week. Use in combination with StartTime and EndTime. Incompatible with StartDay and EndDay. Valid Values:
 
-	Comma delimited list of days of the week in English, or 3 letter abbreviation (e.g. "Monday,Tuesday,Wednesday" or "Mon,Tue,Wed" would both be valid values)
+	Comma delimited list of days of the week in English, or 3 letter abbreviation (e.g. "Monday,Tuesday,Wednesday" or "Mon,Tue,Wed" would both be valid values).
 
 # EnableLastMsgSeqNumProcessed
 
