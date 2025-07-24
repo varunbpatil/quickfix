@@ -21,8 +21,11 @@ import (
 )
 
 var sessionsLock sync.RWMutex
+
 var sessions = make(map[SessionID]*session)
+
 var errDuplicateSessionID = errors.New("Duplicate SessionID")
+
 var errUnknownSession = errors.New("Unknown session")
 
 // Messagable is a Message or something that can be converted to a Message.
@@ -43,12 +46,26 @@ func Send(m Messagable) (err error) {
 		return err
 	}
 
+	// Not checking error because this is an optional field.
+	var targetSubID FIXString
+	_ = msg.Header.GetField(tagTargetSubID, &targetSubID)
+
 	var senderCompID FIXString
 	if err := msg.Header.GetField(tagSenderCompID, &senderCompID); err != nil {
 		return err
 	}
 
-	sessionID := SessionID{BeginString: string(beginString), TargetCompID: string(targetCompID), SenderCompID: string(senderCompID)}
+	// Not checking error because this is an optional field.
+	var senderSubID FIXString
+	_ = msg.Header.GetField(tagSenderSubID, &senderSubID)
+
+	sessionID := SessionID{
+		BeginString:  string(beginString),
+		TargetCompID: string(targetCompID),
+		TargetSubID:  string(targetSubID),
+		SenderCompID: string(senderCompID),
+		SenderSubID:  string(senderSubID),
+	}
 
 	return SendToTarget(msg, sessionID)
 }

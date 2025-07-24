@@ -338,7 +338,7 @@ func (s *session) prepMessageForSend(msg *Message, inReplyTo *Message) (msgBytes
 	return
 }
 
-// forceNextSenderMsgSeqNum
+// forceNextSenderMsgSeqNum.
 func (s *session) forceNextSenderMsgSeqNum(seqNum int) error {
 	return s.store.SetNextSenderMsgSeqNum(seqNum)
 }
