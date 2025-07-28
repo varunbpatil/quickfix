@@ -208,6 +208,7 @@ func ParseMessageWithDataDictionary(
 	msg.Header.add(msg.fields[fieldIndex : fieldIndex+1])
 	fieldIndex++
 
+	msg.bodyBytes = rawBytes
 	trailerBytes := []byte{}
 	foundBody := false
 	for {
@@ -233,9 +234,6 @@ func ParseMessageWithDataDictionary(
 			trailerBytes = rawBytes
 			msg.Body.add(msg.fields[fieldIndex : fieldIndex+1])
 		}
-		if parsedFieldBytes.tag == tagCheckSum {
-			break
-		}
 
 		if !foundBody {
 			msg.bodyBytes = rawBytes
@@ -244,6 +242,11 @@ func ParseMessageWithDataDictionary(
 		if parsedFieldBytes.tag == tagXMLDataLen {
 			xmlDataLen, _ = msg.Header.GetInt(tagXMLDataLen)
 		}
+
+		if parsedFieldBytes.tag == tagCheckSum {
+			break
+		}
+
 		fieldIndex++
 	}
 
@@ -421,5 +424,37 @@ func (m *Message) cook() {
 	bodyLength := m.Header.length() + m.Body.length() + m.Trailer.length()
 	m.Header.SetInt(tagBodyLength, bodyLength)
 	checkSum := (m.Header.total() + m.Body.total() + m.Trailer.total()) % 256
+	m.Trailer.SetString(tagCheckSum, formatCheckSum(checkSum))
+}
+
+// There is currently an issue with parsing FIX messages which contain repeating groups. If you
+// parse a FIX message which contains repeating groups from bytes and then try to send it, the
+// format of the message over the wire will be incorrect. This bypasses the issue by using the
+// raw bytes of the message body.
+// https://github.com/quickfixgo/quickfix/issues/568
+// https://github.com/quickfixgo/quickfix/issues/276
+// https://github.com/avislash/quickfix/pull/3/files
+// https://github.com/clear-street/quickfix/pull/6/files
+func (m *Message) ResendBuild() []byte {
+	m.resendCook()
+
+	var b bytes.Buffer
+	m.Header.write(&b, true /* sorted */)
+	b.Write(m.bodyBytes)
+	m.Trailer.write(&b, true /* sorted */)
+
+	return b.Bytes()
+}
+
+func (m *Message) resendCook() {
+	bodyLength := m.Header.length() + len(m.bodyBytes) + m.Trailer.length()
+	m.Header.SetInt(tagBodyLength, bodyLength)
+
+	bodyTotal := 0
+	for _, b := range []byte(m.bodyBytes) {
+		bodyTotal += int(b)
+	}
+
+	checkSum := (m.Header.total() + bodyTotal + m.Trailer.total()) % 256
 	m.Trailer.SetString(tagCheckSum, formatCheckSum(checkSum))
 }

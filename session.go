@@ -247,6 +247,7 @@ func (s *session) queueForSend(msg *Message) error {
 func (s *session) send(msg *Message) error {
 	return s.sendInReplyTo(msg, nil)
 }
+
 func (s *session) sendInReplyTo(msg *Message, inReplyTo *Message) error {
 	if !s.IsLoggedOn() {
 		return s.queueForSend(msg)
@@ -279,6 +280,7 @@ func (s *session) dropAndReset() error {
 func (s *session) dropAndSend(msg *Message) error {
 	return s.dropAndSendInReplyTo(msg, nil)
 }
+
 func (s *session) dropAndSendInReplyTo(msg *Message, inReplyTo *Message) error {
 	s.sendMutex.Lock()
 	defer s.sendMutex.Unlock()
@@ -326,13 +328,16 @@ func (s *session) prepMessageForSend(msg *Message, inReplyTo *Message) (msgBytes
 				msg.Header.SetField(tagMsgSeqNum, FIXInt(seqNum))
 			}
 		}
+		// For admin messages, use the original `build()` method because the code above modifies the message body.
+		msgBytes = msg.build()
 	} else {
 		if err = s.application.ToApp(msg, s.sessionID); err != nil {
 			return
 		}
+		// For app messages, use the modified `resendBuild()` method which handles repeating groups correctly.
+		msgBytes = msg.ResendBuild()
 	}
 
-	msgBytes = msg.build()
 	err = s.persist(seqNum, msgBytes)
 
 	return
